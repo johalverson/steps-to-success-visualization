@@ -86,7 +86,7 @@
                     <label for="programUrlInput" class="block text-sm font-medium text-gray-700 mb-1">1. Program Coverage Data (X-Axis/Cells)</label>
                     <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
                         <input type="text" id="programUrlInput" 
-                            placeholder="Paste Published CSV URL for Sheet 2 (Goals_Covered, Rigor, Program_Type columns required)" 
+                            placeholder="Paste the link from 'Publish to the web' for Sheet 2" 
                             class="flex-1 p-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" 
                             value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRrjvzfjIw_94rvnndwyogjC_NZ2Z_nNZqdOyyUoybkqk0YaCj8SSb0LQeZDMmDA0qWdmGYAkpZIDJv/pub?gid=0&single=true&output=csv">
                         
@@ -96,7 +96,7 @@
                     </div>
                 </div>
 
-                <div id="statusMessage" class="text-sm text-gray-600 mt-2">Enter your published Google Sheet CSV URL above and click "Load Data" (or wait for the initial load).</div>
+                <div id="statusMessage" class="text-sm text-gray-600 mt-2">Enter your published Google Sheet URL above and click "Load Data". The app will automatically convert the URL to CSV format.</div>
             </div>
 
 
@@ -233,6 +233,29 @@
             { ID: 'G-66', Name: 'Step 66', Grade: '12' },
             { ID: 'G-67', Name: 'Step 67', Grade: '12' }
         ];
+
+        /**
+         * Checks if a Google Sheets "Publish to the web" URL needs the CSV output suffix 
+         * and appends it if necessary. This handles cases where users copy the standard URL.
+         * @param {string} url - The URL provided by the user.
+         * @returns {string} The sanitized URL, ready for d3.csv().
+         */
+        function sanitizeUrl(url) {
+            // 1. If it already has 'output=csv' or another output type, return it as is.
+            if (url.includes('output=')) {
+                return url;
+            }
+            
+            // 2. Check if the URL is a standard published sheet link (includes /pub).
+            if (url.includes('/pub')) {
+                // Determine if a query string separator (? or &) is needed.
+                const separator = url.includes('?') ? '&' : '?';
+                return url + separator + 'output=csv';
+            }
+
+            // 3. Return the original URL if it doesn't look like a Google Sheet publish link.
+            return url;
+        }
         
         // Helper function to update the status message area
         function setStatus(message, isError = false) {
@@ -253,14 +276,17 @@
                 return;
             }
             
-            setStatus("Loading program coverage data...", false);
+            setStatus("Sanitizing URL and loading program coverage data...", false);
+
+            // Apply the automatic CSV suffix logic
+            const sanitizedUrl = sanitizeUrl(programUrl);
             
             // Clear previous chart elements before drawing the new one
             svgContainer.selectAll("g").remove();
             svg = svgContainer.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
             
             // Only load the program data
-            d3.csv(programUrl).then(programData => {
+            d3.csv(sanitizedUrl).then(programData => {
                 
                 console.log("--- DEBUG START (Steps to Success Visualization) ---");
                 console.log("Hardcoded Framework Steps:", hardcodedFrameworkData.length);
@@ -268,7 +294,7 @@
 
                 // Check if program data loaded successfully 
                 if (!programData || programData.length === 0) {
-                    const msg = "Failed to load program data or data is empty. Ensure your Google Sheet is published as CSV and the URL is correct.";
+                    const msg = "Failed to load program data or data is empty. Ensure your Google Sheet is published and the URL is correct.";
                     console.error(msg);
                     setStatus(`Error: ${msg}`, true);
                     return;
@@ -292,7 +318,7 @@
                 console.log("--- DEBUG END ---");
 
             }).catch(error => {
-                const msg = "An error occurred during program data loading. Check your network connection and URL format. Make sure the sheet is published as CSV.";
+                const msg = "An error occurred during program data loading. Check your network connection and URL format. Make sure the sheet is published to the web.";
                 console.error(msg, error);
                 setStatus(`Error: ${msg}`, true);
                 // Display a generic error on the SVG too
