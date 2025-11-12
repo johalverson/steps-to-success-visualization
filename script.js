@@ -1,8 +1,8 @@
 // script.js
 
 // --- 1. USER INPUT: PASTE YOUR PUBLISHED GOOGLE SHEET CSV URLs HERE ---
-const FRAMEWORK_URL = "PASTE_YOUR_SHEET_1_FRAMEWORK_CSV_URL_HERE";
-const PROGRAM_URL = "PASTE_YOUR_SHEET_2_PROGRAMS_CSV_URL_HERE";
+const FRAMEWORK_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTpPudMuby9FvHz-XPkMI7CwQ2QPkm6E8mPr8dQj07Va3Q_tIvo4_AfyhjX5YxgQyWfVIscRqdA9wuV/pubhtml";
+const PROGRAM_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRrjvzfjIw_94rvnndwyogjC_NZ2Z_nNZqdOyyUoybkqk0YaCj8SSb0LQeZDMmDA0qWdmGYAkpZIDJv/pubhtml";
 // --- END USER INPUT ---
 
 // Dimensions and Setup
