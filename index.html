@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Steps to Success Visualization</title>
+    <title>Steps to Success Visualization (Printable)</title>
     <!-- Load Tailwind CSS for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load D3.js -->
@@ -71,12 +71,13 @@
 <body class="p-6">
 
     <div class="max-w-4xl mx-auto container">
-        <h1 class="text-3xl font-extrabold text-gray-800 mb-6">Program Coverage & Overlap Matrix</h1>
+        <!-- TITLE UPDATED HERE -->
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-6">Steps to Success Visualization</h1>
         
         <!-- UI Container (Hidden during Print) -->
-        <div class="print-hidden flex justify-between items-center mb-6 p-4 bg-white rounded-lg shadow-md">
+        <div class="print-hidden flex flex-wrap justify-between items-center mb-6 p-4 bg-white rounded-lg shadow-md">
             <!-- Category Selector -->
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-3 mb-2 sm:mb-0">
                 <label for="categorySelector" class="text-gray-600 font-medium">Group by:</label>
                 <select id="categorySelector" class="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></select>
             </div>
@@ -95,7 +96,7 @@
             <svg id="timeline-chart"></svg>
         </div>
         
-        <!-- Legend/Key (Optional - not implemented in JS yet, just space) -->
+        <!-- Legend/Key -->
         <div class="mt-8 p-4 bg-white rounded-lg shadow-md print-hidden">
             <h3 class="text-lg font-semibold text-gray-700 mb-2">Legend</h3>
             <div class="flex space-x-6">
@@ -154,30 +155,41 @@
                 d3.csv(PROGRAM_URL)
             ]).then(([frameworkData, programData]) => {
                 
-                // This checks if the data was loaded successfully (i.e., if the URLs were correct)
+                console.log("--- DEBUG START (Steps to Success Visualization) ---");
+                console.log("Sheet 1 (Framework) data length:", frameworkData.length);
+                console.log("Sheet 2 (Program) data length:", programData.length);
+
+                // Check if data loaded successfully 
                 if (!frameworkData || !programData || frameworkData.length === 0 || programData.length === 0) {
-                    console.error("Failed to load data or data is empty. Ensure both Google Sheets are published as CSV and the URLs in script.js are correct.");
-                    // Display an error message directly on the SVG
+                    console.error("Failed to load data or data is empty. Ensure both Google Sheets are published as CSV.");
                     svg.append("text")
                        .attr("x", width / 2)
                        .attr("y", height / 2)
                        .attr("text-anchor", "middle")
                        .style("font-size", "16px")
                        .text("Error: Data not loaded. Check console for URL issues.");
+                    console.log("--- DEBUG END ---");
                     return;
                 }
+                
+                if (programData.length > 0) {
+                    // CRITICAL DEBUG LOG
+                    console.log("Sheet 2 (Program) Headers detected:", Object.keys(programData[0]));
+                    console.log("Required headers for grouping are 'Rigor' and 'Program_Type'. Required for linkage are 'Goals_Covered' and 'Program_Name'.");
+                }
+
 
                 allFrameworkData = frameworkData;
                 
-                // 1. Setup the static Y-Axis (Handles the 67 Steps)
+                // 1. Setup the static Y-Axis (Goals)
                 setupYAxis(frameworkData); 
                 
                 // 2. Setup the dynamic X-Axis Selector
                 setupCategorySelector(programData);
+                console.log("--- DEBUG END ---");
 
             }).catch(error => {
-                console.error("An error occurred during data loading. Check your network connection and URL format:", error);
-                // Display an error message directly on the SVG
+                console.error("An error occurred during data loading:", error);
                 svg.append("text")
                    .attr("x", width / 2)
                    .attr("y", height / 2)
@@ -201,7 +213,7 @@
                 .range([0, dynamicHeight])
                 .paddingInner(0.1); 
 
-            // Draw the Y-axis (Now uses "Step X" instead of goal names)
+            // Draw the Y-axis 
             svg.append("g")
                 .attr("class", "y-axis")
                 // Use the Name property from the framework data for the tick label
@@ -254,11 +266,15 @@
 
                 programsInGroup.forEach(program => {
                     // Split the Goals_Covered string, handling potential spaces/commas
+                    // Check if Goals_Covered exists before splitting
                     const goalsCoveredArray = program.Goals_Covered ? program.Goals_Covered.split(',').map(g => g.trim()) : [];
                     
                     goalsCoveredArray.forEach(goalId => {
                         const currentPrograms = goalProgramsMap.get(goalId) || [];
-                        currentPrograms.push(program.Program_Name); 
+                        // Check if Program_Name exists before pushing
+                        if (program.Program_Name) {
+                            currentPrograms.push(program.Program_Name); 
+                        }
                         goalProgramsMap.set(goalId, currentPrograms);
                     });
                 });
@@ -276,8 +292,14 @@
             }
 
             // B. X-Axis Setup
-            // Use Array.from(new Set(...)) for IE/older browser compatibility 
+            // Filter out null/empty category values before creating the domain
             const categoryDomains = Array.from(new Set(allProgramData.map(d => d[categoryKey]))).filter(d => d).sort();
+
+            console.log(`[Draw] Grouping by: '${categoryKey}'. Found ${categoryDomains.length} unique X-axis categories.`);
+            if (categoryDomains.length === 0) {
+                 console.warn(`[Draw Warning] No unique category domains found for X-Axis. Check if column '${categoryKey}' exists and contains data in your Sheet 2.`);
+            }
+
 
             const xScale = d3.scaleBand()
                 .domain(categoryDomains)
