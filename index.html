@@ -71,7 +71,25 @@
 <body class="p-6">
 
     <div class="max-w-4xl mx-auto container">
-        <h1 class="text-3xl font-extrabold text-gray-800 mb-6">Steps to Success Visualization</h1>
+        
+        <!-- === NEW LOGO SECTION === -->
+        <!-- Wrap title and logo in a flex container to center them -->
+        <div class="flex flex-col items-center w-full mb-6">
+            <!-- 
+              ACTION REQUIRED: Add your logo image.
+              1. Replace the 'src' URL below with a direct link to your school's logo.
+              2. The logo must be hosted online (e.g., on your school's website).
+              3. Adjust height with Tailwind's 'h-xx' classes (e.g., h-12, h-16, h-20).
+            -->
+            <img id="school-logo" 
+                 src="https://cmsv2-assets.apptegy.net/uploads/15748/logo/16725/Rocherster_district_logo_web.png" 
+                 alt="School District Logo" 
+                 class="h-16 w-auto mb-4 print-hidden"> <!-- h-16 = 4rem (64px). w-auto maintains aspect ratio. -->
+            
+            <h1 class="text-3xl font-extrabold text-gray-800">Steps to Success Visualization</h1>
+        </div>
+        <!-- === END NEW LOGO SECTION === -->
+
         
         <!-- UI Container (Hidden during Print) -->
         <div class="print-hidden flex flex-col items-start mb-6 p-4 bg-white rounded-lg shadow-md">
@@ -88,7 +106,7 @@
                         <input type="text" id="programUrlInput" 
                             placeholder="Paste the link from 'Publish to the web' for Sheet 2" 
                             class="flex-1 p-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                            value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRrjvzfjIw_94rvnndwyogjC_NZ2Z_nNZqdOyyUoybkqk0YaCj8SSb0LQeZDMmDA0qWdmGYAkpZIDJv/pubhtml">
+                            value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRrjvzfjIw_94rvnndwyogjC_NZ2Z_nNZqdOyyUoybkqk0YaCjS8SSb0LQeZDMmDA0qWdmGYAkpZIDJv/pubhtml">
                         
                         <button id="loadDataButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-150 ease-in-out whitespace-nowrap">
                             Load Data
@@ -162,6 +180,7 @@
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
         const tooltip = d3.select("#tooltip");
+        // These keys must match the headers in your Sheet 2
         const categoryOptions = ["Rigor", "Program_Type"]; 
         let yScale; 
         let allFrameworkData; 
@@ -271,6 +290,11 @@
             statusEl.className = isError 
                 ? 'text-sm font-semibold text-red-600 mt-2' 
                 : 'text-sm text-gray-600 mt-2';
+            
+            // Clear any previous error text on the SVG
+            if (!isError) {
+                svg.selectAll(".error-text").remove();
+            }
         }
 
         // --- 1. CORE LOGIC: DATA LOADING AND DRAWING ---
@@ -285,9 +309,8 @@
             
             setStatus("Sanitizing URL and loading program coverage data...", false);
 
-            // Apply the automatic CSV suffix logic
             const sanitizedUrl = sanitizeUrl(programUrl);
-            console.log("Sanitized URL for D3.csv (FIXED):", sanitizedUrl); // Log the final URL
+            console.log("Sanitized URL for D3.csv:", sanitizedUrl); 
             
             // Clear previous chart elements before drawing the new one
             svgContainer.selectAll("g").remove();
@@ -307,9 +330,21 @@
                     return;
                 }
                 
+                // IMPORTANT VALIDATION: Check for expected headers in the program data
+                const expectedHeaders = ["Program_Name", "Goals_Covered", "Rigor", "Program_Type"];
+                const actualHeaders = Object.keys(programData[0] || {});
+                const missingHeaders = expectedHeaders.filter(header => !actualHeaders.includes(header));
+
+                if (missingHeaders.length > 0) {
+                    const msg = `Data loaded, but essential columns are missing or incorrectly named: ${missingHeaders.join(', ')}. Check your spreadsheet headers.`;
+                    console.error(msg, "Expected:", expectedHeaders, "Got:", actualHeaders);
+                    setStatus(`Critical Error: ${msg}`, true);
+                    return;
+                }
+
                 setStatus("Data loaded successfully. Drawing visualization...", false);
 
-                allFrameworkData = hardcodedFrameworkData; // Use hardcoded data
+                allFrameworkData = hardcodedFrameworkData; 
                 
                 // 1. Setup the static Y-Axis (Goals) - uses hardcoded data
                 setupYAxis(hardcodedFrameworkData); 
@@ -319,16 +354,18 @@
                 console.log("--- DEBUG END ---");
 
             }).catch(error => {
-                const msg = "An error occurred during program data loading. Check your network connection and URL format. Make sure the sheet is published to the web.";
+                const msg = "An error occurred during program data loading. Check your network connection and the published URL format.";
                 console.error(msg, error);
                 setStatus(`Error: ${msg}`, true);
                 // Display a generic error on the SVG too
                 svg.append("text")
+                   .attr("class", "error-text")
                    .attr("x", initialWidth / 2) // Use initialWidth for fallback text centering
                    .attr("y", 150)
                    .attr("text-anchor", "middle")
                    .style("font-size", "16px")
-                   .text("Error: Data loading failed.");
+                   .style("fill", "#c0392b")
+                   .text("Data loading failed. See Status message for details.");
             });
         }
 
@@ -391,11 +428,18 @@
             } else if (programCount === 1) {
                 return "#3498db"; // Blue for Coverage
             } else {
-                return "transparent";
+                // If 0 programs, ensure it's a light background or transparent
+                return "#f0f0f0"; // Light Gray for No Coverage
             }
         }
 
         function drawChart(categoryKey, allProgramData) {
+            // Clear any previous drawing elements
+            svg.selectAll(".coverage-cell").remove();
+            svg.selectAll(".x-axis").remove();
+            svg.selectAll(".error-text").remove(); // Clear previous errors
+            setStatus("Drawing visualization...", false);
+
             // A. Data Aggregation
             const nestedData = d3.group(allProgramData, d => d[categoryKey]);
             const cellData = [];
@@ -405,10 +449,12 @@
 
                 programsInGroup.forEach(program => {
                     // Split the Goals_Covered string, handling potential spaces/commas
-                    // Check if Goals_Covered exists before splitting
                     const goalsCoveredArray = program.Goals_Covered ? program.Goals_Covered.split(',').map(g => g.trim()) : [];
                     
                     goalsCoveredArray.forEach(goalId => {
+                        // Skip empty goal IDs
+                        if (!goalId) return; 
+                        
                         const currentPrograms = goalProgramsMap.get(goalId) || [];
                         // Check if Program_Name exists before pushing
                         if (program.Program_Name) {
@@ -429,7 +475,7 @@
                     }
                 }
             }
-
+            
             // B. X-Axis Setup
             // Filter out null/empty category values before creating the domain
             const categoryDomains = Array.from(new Set(allProgramData.map(d => d[categoryKey]))).filter(d => d).sort();
@@ -437,14 +483,29 @@
             // Calculate Dynamic Width based on categories
             currentChartWidth = Math.max(initialWidth, categoryDomains.length * MIN_CATEGORY_WIDTH);
 
-            // Update SVG container width dynamically. This is the fix for the hanging issue.
+            // --- CRITICAL ERROR CHECK ---
+            if (categoryDomains.length === 0) {
+                const msg = `Critical Error: Cannot find any unique values in the '${categoryKey.replace(/_/g, ' ')}' column. Please verify the header name in your published Sheet 2.`;
+                setStatus(msg, true);
+                console.error(msg);
+                
+                svg.append("text")
+                   .attr("class", "error-text")
+                   .attr("x", initialWidth / 2) 
+                   .attr("y", 150)
+                   .attr("text-anchor", "middle")
+                   .style("font-size", "16px")
+                   .style("fill", "#c0392b")
+                   .text("Drawing failed. Check the category column header.");
+                return; 
+            }
+            
+            // Update SVG container width dynamically.
             svgContainer.attr("width", currentChartWidth + margin.left + margin.right);
 
             console.log(`[Draw] Grouping by: '${categoryKey}'. Found ${categoryDomains.length} unique X-axis categories. Dynamic Width: ${currentChartWidth}px`);
-            
-            if (categoryDomains.length === 0) {
-                 console.warn(`[Draw Warning] No unique category domains found for X-Axis. Check if column '${categoryKey}' exists and contains data in your Sheet 2.`);
-            }
+            console.log(`[Draw] Generated ${cellData.length} total coverage cells.`);
+
 
             const xScale = d3.scaleBand()
                 .domain(categoryDomains)
@@ -452,7 +513,6 @@
                 .paddingInner(0.1);
 
             // Redraw X-Axis
-            svg.selectAll(".x-axis").remove();
             svg.append("g")
                 .attr("class", "x-axis")
                 .call(d3.axisTop(xScale)) 
@@ -502,6 +562,12 @@
                     tooltip.style("visibility", "hidden");
                     d3.select(this).attr("stroke", "none");
                 });
+            
+            if (cellData.length > 0) {
+                 setStatus("Visualization ready.", false);
+            } else {
+                 setStatus("Warning: Data loaded, but no covered goals were found. Check the 'Goals_Covered' column in your sheet.", true);
+            }
         }
 
         // --- 3. APP SETUP ---
