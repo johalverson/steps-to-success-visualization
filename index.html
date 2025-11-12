@@ -38,6 +38,12 @@
             visibility: hidden;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+        
+        /* Update: Ensure X-axis labels are readable */
+        .x-axis text {
+            font-size: 14px; /* Larger size */
+            font-weight: 600; /* Bolder */
+        }
 
         /* --- PRINT STYLES --- */
         @media print {
@@ -64,6 +70,10 @@
             /* Ensure Y-axis labels are readable */
             .y-axis text {
                 font-size: 9px; 
+            }
+             /* Add print size for X-axis */
+            .x-axis text {
+                font-size: 10px;
             }
         }
     </style>
@@ -517,10 +527,11 @@
                 .attr("class", "x-axis")
                 .call(d3.axisTop(xScale)) 
                 .selectAll("text")
-                .style("text-anchor", "end")
-                .attr("dx", "-.8em")
-                .attr("dy", ".15em")
-                .attr("transform", "rotate(-35)"); // Rotate labels to prevent overlap
+                // UPDATED: No rotation (0 degrees) for horizontal alignment
+                .style("text-anchor", "middle")
+                .attr("dx", "0em")
+                .attr("dy", "-.5em")
+                .attr("transform", "rotate(0)"); // Completely removed slant
 
             // C. Drawing Cells (Rectangles)
             const cells = svg.selectAll(".coverage-cell")
