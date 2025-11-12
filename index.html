@@ -2,24 +2,338 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Steps to Success Visualization</title>
-    <link rel="stylesheet" href="style.css">
+    <!-- Load Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load D3.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Define the font family for better aesthetics */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+        }
+        /* Custom styles for the D3 chart cells */
+        .coverage-cell {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .coverage-cell:hover {
+            opacity: 0.9;
+        }
+
+        /* Tooltip styling */
+        #tooltip {
+            position: absolute;
+            text-align: left;
+            padding: 10px;
+            font-size: 12px;
+            background: #2d3748; /* Dark background */
+            color: #f7fafc; /* Light text */
+            border: 0px;
+            border-radius: 6px;
+            pointer-events: none;
+            visibility: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* --- PRINT STYLES --- */
+        @media print {
+            /* Hide non-essential elements when printing */
+            .print-hidden {
+                display: none !important;
+            }
+            /* Reset background for better printing */
+            body, .container {
+                background-color: white !important;
+            }
+            /* Adjust SVG container to fit standard paper width */
+            #chart-container {
+                width: 100%;
+                /* Remove margin around chart */
+                padding: 0;
+            }
+            /* Ensure the SVG scales up/down nicely on the page */
+            #timeline-chart {
+                /* Let the browser handle the scaling */
+                max-width: 100%;
+                height: auto !important; 
+            }
+            /* Ensure Y-axis labels are readable */
+            .y-axis text {
+                font-size: 9px; 
+            }
+        }
+    </style>
 </head>
-<body>
-    <h1>Curricular Goal Coverage Tool</h1>
-    
-    <div class="controls">
-        <label for="categorySelector">Group Coverage By:</label>
-        <select id="categorySelector"></select>
+<body class="p-6">
+
+    <div class="max-w-4xl mx-auto container">
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-6">Program Coverage & Overlap Matrix</h1>
+        
+        <!-- UI Container (Hidden during Print) -->
+        <div class="print-hidden flex justify-between items-center mb-6 p-4 bg-white rounded-lg shadow-md">
+            <!-- Category Selector -->
+            <div class="flex items-center space-x-3">
+                <label for="categorySelector" class="text-gray-600 font-medium">Group by:</label>
+                <select id="categorySelector" class="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></select>
+            </div>
+
+            <!-- Print Button (Triggers window.print()) -->
+            <button onclick="window.print()" class="print-button bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-150 ease-in-out flex items-center space-x-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm12 0h-4v3h4V4zM4 12v3h14v-3H4z" clip-rule="evenodd" />
+                </svg>
+                <span>Print to PDF</span>
+            </button>
+        </div>
+
+        <!-- Chart Container -->
+        <div id="chart-container" class="bg-white p-4 rounded-lg shadow-lg overflow-x-auto">
+            <svg id="timeline-chart"></svg>
+        </div>
+        
+        <!-- Legend/Key (Optional - not implemented in JS yet, just space) -->
+        <div class="mt-8 p-4 bg-white rounded-lg shadow-md print-hidden">
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Legend</h3>
+            <div class="flex space-x-6">
+                <div class="flex items-center space-x-2">
+                    <div class="w-4 h-4 rounded-sm" style="background-color: #3498db;"></div>
+                    <span class="text-sm text-gray-600">Coverage (1 Program)</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div class="w-4 h-4 rounded-sm" style="background-color: #c0392b;"></div>
+                    <span class="text-sm text-gray-600">Overlap (2+ Programs)</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div class="w-4 h-4 rounded-sm bg-gray-200 border border-gray-400"></div>
+                    <span class="text-sm text-gray-600">No Coverage (0 Programs)</span>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div id="visualization">
-        <svg id="timeline-chart"></svg>
-    </div>
+    <!-- Tooltip Element -->
+    <div id="tooltip" class="rounded-lg shadow-xl"></div>
 
-    <div id="tooltip" class="tooltip"></div>
 
-    <script src="script.js"></script>
+    <!-- JavaScript (D3 Logic) -->
+    <script>
+        // script.js content integrated here
+
+        // --- 1. USER INPUT: PASTE YOUR PUBLISHED GOOGLE SHEET CSV URLs HERE ---
+        // These are the corrected CSV links from the previous turn
+        const FRAMEWORK_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTpPudMuby9FvHz-XPkMI7CwQ2QPkm6E8mPr8dQj07Va3Q_tIvo4_AfyhjX5YxgQyWfVIscRqdA9wuV/pub?gid=0&single=true&output=csv";
+        const PROGRAM_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRrjvzfjIw_94rvnndwyogjC_NZ2Z_nNZqdOyyUoybkqk0YaCj8SSb0LQeZDMmDA0qWdmGYAkpZIDJv/pub?gid=0&single=true&output=csv";
+        // --- END USER INPUT ---
+
+        // Dimensions and Setup
+        const margin = {top: 50, right: 20, bottom: 20, left: 100},
+              width = 700 - margin.left - margin.right,
+              height = 500 - margin.top - margin.bottom; 
+
+        const svg = d3.select("#timeline-chart")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const tooltip = d3.select("#tooltip");
+        const categoryOptions = ["Rigor", "Program_Type"]; 
+        let yScale; 
+        let allFrameworkData; 
+
+        // --- 2. INITIALIZATION (Loads Data from URLs) ---
+
+        function initializeChart() {
+            // Use Promise.all to ensure both CSV files load before drawing
+            Promise.all([
+                d3.csv(FRAMEWORK_URL),
+                d3.csv(PROGRAM_URL)
+            ]).then(([frameworkData, programData]) => {
+                
+                // This checks if the data was loaded successfully (i.e., if the URLs were correct)
+                if (!frameworkData || !programData || frameworkData.length === 0 || programData.length === 0) {
+                    console.error("Failed to load data or data is empty. Ensure both Google Sheets are published as CSV and the URLs in script.js are correct.");
+                    // Display an error message directly on the SVG
+                    svg.append("text")
+                       .attr("x", width / 2)
+                       .attr("y", height / 2)
+                       .attr("text-anchor", "middle")
+                       .style("font-size", "16px")
+                       .text("Error: Data not loaded. Check console for URL issues.");
+                    return;
+                }
+
+                allFrameworkData = frameworkData;
+                
+                // 1. Setup the static Y-Axis (Handles the 67 Steps)
+                setupYAxis(frameworkData); 
+                
+                // 2. Setup the dynamic X-Axis Selector
+                setupCategorySelector(programData);
+
+            }).catch(error => {
+                console.error("An error occurred during data loading. Check your network connection and URL format:", error);
+                // Display an error message directly on the SVG
+                svg.append("text")
+                   .attr("x", width / 2)
+                   .attr("y", height / 2)
+                   .attr("text-anchor", "middle")
+                   .style("font-size", "16px")
+                   .text("Error: Data loading failed. Check console.");
+            });
+        }
+
+        // Y-Axis (Goals) Setup
+        function setupYAxis(frameworkData) {
+            const goalIDs = frameworkData.map(d => d.ID); 
+            
+            // Calculate a height suitable for 67 goals (e.g., 18 pixels per step)
+            const stepHeight = 18; 
+            const dynamicHeight = goalIDs.length * stepHeight; 
+            d3.select("#timeline-chart").attr("height", dynamicHeight + margin.top + margin.bottom);
+            
+            yScale = d3.scaleBand()
+                .domain(goalIDs) 
+                .range([0, dynamicHeight])
+                .paddingInner(0.1); 
+
+            // Draw the Y-axis (Now uses "Step X" instead of goal names)
+            svg.append("g")
+                .attr("class", "y-axis")
+                // Use the Name property from the framework data for the tick label
+                .call(d3.axisLeft(yScale).tickFormat(d => frameworkData.find(g => g.ID === d)?.Name || d)) 
+                .selectAll("text")
+                .attr("dy", ".32em")
+                .style("text-anchor", "end");
+        }
+
+        // Category Selector Setup
+        function setupCategorySelector(programData) {
+            d3.select("#categorySelector")
+                .selectAll("option")
+                .data(categoryOptions)
+                .enter()
+                .append("option")
+                .text(d => d.replace(/_/g, ' '))
+                .attr("value", d => d);
+
+            // Initial draw
+            const initialCategory = categoryOptions[0];
+            drawChart(initialCategory, programData);
+
+            // Listener for change
+            d3.select("#categorySelector").on("change", function() {
+                const newCategory = d3.select(this).property("value");
+                drawChart(newCategory, programData);
+            });
+        }
+
+        // --- 3. CORE LOGIC: DRAW CHART & AGGREGATE DATA ---
+
+        function getColor(programCount) {
+            if (programCount >= 2) {
+                return "#c0392b"; // Red for Overlap
+            } else if (programCount === 1) {
+                return "#3498db"; // Blue for Coverage
+            } else {
+                return "transparent";
+            }
+        }
+
+        function drawChart(categoryKey, allProgramData) {
+            // A. Data Aggregation
+            const nestedData = d3.group(allProgramData, d => d[categoryKey]);
+            const cellData = [];
+
+            for (const [categoryValue, programsInGroup] of nestedData) {
+                let goalProgramsMap = new Map(); 
+
+                programsInGroup.forEach(program => {
+                    // Split the Goals_Covered string, handling potential spaces/commas
+                    const goalsCoveredArray = program.Goals_Covered ? program.Goals_Covered.split(',').map(g => g.trim()) : [];
+                    
+                    goalsCoveredArray.forEach(goalId => {
+                        const currentPrograms = goalProgramsMap.get(goalId) || [];
+                        currentPrograms.push(program.Program_Name); 
+                        goalProgramsMap.set(goalId, currentPrograms);
+                    });
+                });
+
+                for (const [goalId, programNames] of goalProgramsMap) {
+                    if (yScale.domain().includes(goalId)) { 
+                        cellData.push({
+                            goalId: goalId,
+                            category: categoryValue,
+                            programCount: programNames.length,
+                            programNames: programNames 
+                        });
+                    }
+                }
+            }
+
+            // B. X-Axis Setup
+            // Use Array.from(new Set(...)) for IE/older browser compatibility 
+            const categoryDomains = Array.from(new Set(allProgramData.map(d => d[categoryKey]))).filter(d => d).sort();
+
+            const xScale = d3.scaleBand()
+                .domain(categoryDomains)
+                .range([0, width])
+                .paddingInner(0.1);
+
+            // Redraw X-Axis
+            svg.selectAll(".x-axis").remove();
+            svg.append("g")
+                .attr("class", "x-axis")
+                .call(d3.axisTop(xScale)); 
+
+            // C. Drawing Cells (Rectangles)
+            const cells = svg.selectAll(".coverage-cell")
+                .data(cellData, d => d.goalId + d.category);
+
+            // EXIT (remove old cells)
+            cells.exit().remove();
+
+            // ENTER + UPDATE (draw new/update existing cells)
+            cells.enter()
+                .append("rect")
+                .attr("class", "coverage-cell")
+                .merge(cells) 
+                .attr("x", d => xScale(d.category))
+                .attr("y", d => yScale(d.goalId))
+                .attr("width", xScale.bandwidth())
+                .attr("height", yScale.bandwidth())
+                .attr("fill", d => getColor(d.programCount))
+                
+                // --- Tooltip Interactivity ---
+                .on("mouseover", function(event, d) {
+                    tooltip.style("visibility", "visible");
+                    d3.select(this).attr("stroke", "#2c3e50").attr("stroke-width", 2);
+                })
+                .on("mousemove", function(event, d) {
+                    // Find the Step Name for the tooltip using the global framework data
+                    const goalName = allFrameworkData.find(g => g.ID === d.goalId)?.Name || d.goalId;
+
+                    tooltip.style("left", (event.pageX + 10) + "px")     
+                           .style("top", (event.pageY - 20) + "px")
+                           .html(`
+                               <strong>Goal:</strong> ${goalName}<br>
+                               <strong>Category:</strong> ${d.category}<br>
+                               <strong>Programs:</strong> ${d.programNames.join(", ")}<br>
+                               ${d.programCount >= 2 ? `<strong>Overlap: ${d.programCount} programs</strong>` : 'Coverage'}
+                           `);
+                })
+                .on("mouseout", function() {
+                    tooltip.style("visibility", "hidden");
+                    d3.select(this).attr("stroke", "none");
+                });
+        }
+
+        // Start the process by loading the data
+        initializeChart();
+    </script>
 </body>
 </html>
