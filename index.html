@@ -88,7 +88,7 @@
                         <input type="text" id="programUrlInput" 
                             placeholder="Paste the link from 'Publish to the web' for Sheet 2" 
                             class="flex-1 p-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                            value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRrjvzfjIw_94rvnndwyogjC_NZ2Z_nNZqdOyyUoybkqk0YaCj8SSb0LQeZDMmDA0qWdmGYAkpZIDJv/pub?gid=0&single=true&output=csv">
+                            value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRrjvzfjIw_94rvnndwyogjC_NZ2Z_nNZqdOyyUoybkqk0YaCj8SSb0LQeZDMmDA0qWdmGYAkpZIDJv/pubhtml">
                         
                         <button id="loadDataButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-150 ease-in-out whitespace-nowrap">
                             Load Data
@@ -236,25 +236,29 @@
 
         /**
          * Checks if a Google Sheets "Publish to the web" URL needs the CSV output suffix 
-         * and appends it if necessary. This handles cases where users copy the standard URL.
+         * and appends it if necessary. This now ensures the GID (sheet ID) is included 
+         * for robust data loading.
          * @param {string} url - The URL provided by the user.
          * @returns {string} The sanitized URL, ready for d3.csv().
          */
         function sanitizeUrl(url) {
-            // 1. If it already has 'output=csv' or another output type, return it as is.
-            if (url.includes('output=')) {
-                return url;
-            }
-            
-            // 2. Check if the URL is a standard published sheet link (includes /pub).
-            if (url.includes('/pub')) {
-                // Determine if a query string separator (? or &) is needed.
-                const separator = url.includes('?') ? '&' : '?';
-                return url + separator + 'output=csv';
+            let normalizedUrl = url;
+
+            // 1. Replace the common published HTML endpoint with the base publish path
+            if (normalizedUrl.includes('/pubhtml')) {
+                normalizedUrl = normalizedUrl.replace('/pubhtml', '/pub');
             }
 
-            // 3. Return the original URL if it doesn't look like a Google Sheet publish link.
-            return url;
+            // 2. If it already includes output=csv, assume it's fully correct and return it.
+            if (normalizedUrl.includes('output=csv')) {
+                return normalizedUrl;
+            }
+
+            // 3. Determine the query string separator (? or &)
+            const separator = normalizedUrl.includes('?') ? '&' : '?';
+            
+            // 4. Append mandatory parameters for robust CSV export. gid=0 targets the first tab.
+            return normalizedUrl + separator + 'gid=0&single=true&output=csv';
         }
         
         // Helper function to update the status message area
@@ -280,6 +284,7 @@
 
             // Apply the automatic CSV suffix logic
             const sanitizedUrl = sanitizeUrl(programUrl);
+            console.log("Sanitized URL for D3.csv (FIXED):", sanitizedUrl); // Log the final URL
             
             // Clear previous chart elements before drawing the new one
             svgContainer.selectAll("g").remove();
