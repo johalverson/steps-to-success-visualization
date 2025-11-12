@@ -82,23 +82,16 @@
 
     <div class="max-w-4xl mx-auto container">
         
-        <!-- === NEW LOGO SECTION === -->
-        <!-- Wrap title and logo in a flex container to center them -->
+        <!-- === LOGO SECTION === -->
         <div class="flex flex-col items-center w-full mb-6">
-            <!-- 
-              ACTION REQUIRED: Add your logo image.
-              1. Replace the 'src' URL below with a direct link to your school's logo.
-              2. The logo must be hosted online (e.g., on your school's website).
-              3. Adjust height with Tailwind's 'h-xx' classes (e.g., h-12, h-16, h-20).
-            -->
             <img id="school-logo" 
                  src="https://cmsv2-assets.apptegy.net/uploads/15748/logo/16725/Rocherster_district_logo_web.png" 
                  alt="School District Logo" 
-                 class="h-16 w-auto mb-4 print-hidden"> <!-- h-16 = 4rem (64px). w-auto maintains aspect ratio. -->
+                 class="h-16 w-auto mb-4 print-hidden"> 
             
             <h1 class="text-3xl font-extrabold text-gray-800">Steps to Success Visualization</h1>
         </div>
-        <!-- === END NEW LOGO SECTION === -->
+        <!-- === END LOGO SECTION === -->
 
         
         <!-- UI Container (Hidden during Print) -->
@@ -116,7 +109,7 @@
                         <input type="text" id="programUrlInput" 
                             placeholder="Paste the link from 'Publish to the web' for Sheet 2" 
                             class="flex-1 p-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                            value=""> <!-- VALUE CLEARED HERE -->
+                            value="">
                         
                         <button id="loadDataButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-150 ease-in-out whitespace-nowrap">
                             Load Data
@@ -124,7 +117,7 @@
                     </div>
                 </div>
 
-                <div id="statusMessage" class="text-sm text-red-600 font-semibold mt-2">Error: The Program Coverage URL must be provided.</div>
+                <div id="statusMessage" class="text-sm text-red-600 font-semibold mt-2"></div>
             </div>
 
 
@@ -177,10 +170,8 @@
     <!-- JavaScript (D3 Logic) -->
     <script>
         // Dimensions and Setup
-        const margin = {top: 50, right: 20, bottom: 20, left: 100},
-              // Renamed fixed width to initialWidth
-              initialWidth = 700 - margin.left - margin.right; 
-
+        const margin = {top: 50, right: 20, bottom: 20, left: 100};
+        const initialWidth = 700 - margin.left - margin.right; // Base width for initial centering
         const MIN_CATEGORY_WIDTH = 100; // Define minimum width for each category column
         let currentChartWidth = initialWidth; // Variable to hold the dynamically calculated width
 
@@ -268,28 +259,22 @@
 
         /**
          * Checks if a Google Sheets "Publish to the web" URL needs the CSV output suffix 
-         * and appends it if necessary. This now ensures the GID (sheet ID) is included 
-         * for robust data loading.
-         * @param {string} url - The URL provided by the user.
-         * @returns {string} The sanitized URL, ready for d3.csv().
+         * and appends it if necessary.
          */
         function sanitizeUrl(url) {
             let normalizedUrl = url;
 
-            // 1. Replace the common published HTML endpoint with the base publish path
             if (normalizedUrl.includes('/pubhtml')) {
                 normalizedUrl = normalizedUrl.replace('/pubhtml', '/pub');
             }
 
-            // 2. If it already includes output=csv, assume it's fully correct and return it.
             if (normalizedUrl.includes('output=csv')) {
                 return normalizedUrl;
             }
 
-            // 3. Determine the query string separator (? or &)
             const separator = normalizedUrl.includes('?') ? '&' : '?';
             
-            // 4. Append mandatory parameters for robust CSV export. gid=0 targets the first tab.
+            // Append mandatory parameters for robust CSV export. 
             return normalizedUrl + separator + 'gid=0&single=true&output=csv';
         }
         
@@ -300,20 +285,35 @@
             statusEl.className = isError 
                 ? 'text-sm font-semibold text-red-600 mt-2' 
                 : 'text-sm text-gray-600 mt-2';
-            
-            // Clear any previous error text on the SVG
-            if (!isError) {
-                svg.selectAll(".error-text").remove();
-            }
         }
+
+        // Display instruction text inside the SVG area
+        function showInitialPrompt() {
+            // Remove any previous error/prompt text
+            svg.selectAll(".prompt-text").remove(); 
+            svg.selectAll(".coverage-cell").remove();
+            svg.selectAll(".x-axis").remove();
+
+            svg.append("text")
+                .attr("class", "prompt-text")
+                .attr("x", currentChartWidth / 2) 
+                .attr("y", 150)
+                .attr("text-anchor", "middle")
+                .style("font-size", "18px")
+                .style("fill", "#6B7280") // Gray text
+                .text("Paste your Google Sheet 'Publish to the web' link above and click 'Load Data'.");
+            
+            setStatus("Please provide the Program Coverage URL to visualize data.", true);
+        }
+
 
         // --- 1. CORE LOGIC: DATA LOADING AND DRAWING ---
 
         function loadDataAndDrawChart(programUrl) {
             
-            // Check for valid URL
+            // Check for valid URL and display prompt if empty
             if (!programUrl) {
-                setStatus("Error: The Program Coverage URL must be provided.", true);
+                showInitialPrompt(); 
                 return;
             }
             
@@ -323,9 +323,10 @@
             console.log("Sanitized URL for D3.csv:", sanitizedUrl); 
             
             // Clear previous chart elements before drawing the new one
-            svgContainer.selectAll("g").remove();
-            // Re-initialize the main 'g' element with initial transform
-            svg = svgContainer.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+            // We keep the Y-Axis element (y-axis) which is drawn in setupApp
+            svg.selectAll(".prompt-text").remove();
+            svg.selectAll(".coverage-cell").remove();
+            svg.selectAll(".x-axis").remove();
             
             // Only load the program data
             d3.csv(sanitizedUrl).then(programData => {
@@ -337,6 +338,15 @@
                     const msg = "Failed to load program data or data is empty. Ensure your Google Sheet is published and the URL is correct.";
                     console.error(msg);
                     setStatus(`Error: ${msg}`, true);
+                    // Display error in the chart area as well
+                    svg.append("text")
+                        .attr("class", "prompt-text")
+                        .attr("x", currentChartWidth / 2) 
+                        .attr("y", 150)
+                        .attr("text-anchor", "middle")
+                        .style("font-size", "16px")
+                        .style("fill", "#c0392b")
+                        .text("Data loading failed. See Status message for details.");
                     return;
                 }
                 
@@ -346,22 +356,24 @@
                 const missingHeaders = expectedHeaders.filter(header => !actualHeaders.includes(header));
 
                 if (missingHeaders.length > 0) {
-                    const msg = `Data loaded, but essential columns are missing or incorrectly named: ${missingHeaders.join(', ')}. Check your spreadsheet headers.`;
+                    const msg = `Data loaded, but essential columns are missing: ${missingHeaders.join(', ')}. Check your spreadsheet headers.`;
                     console.error(msg, "Expected:", expectedHeaders, "Got:", actualHeaders);
                     setStatus(`Critical Error: ${msg}`, true);
+                     svg.append("text")
+                        .attr("class", "prompt-text")
+                        .attr("x", currentChartWidth / 2) 
+                        .attr("y", 150)
+                        .attr("text-anchor", "middle")
+                        .style("font-size", "16px")
+                        .style("fill", "#c0392b")
+                        .text("Data column names incorrect. Check Status message.");
                     return;
                 }
 
                 setStatus("Data loaded successfully. Drawing visualization...", false);
-
-                allFrameworkData = hardcodedFrameworkData; 
                 
-                // 1. Setup the static Y-Axis (Goals) - uses hardcoded data
-                setupYAxis(hardcodedFrameworkData); 
-                
-                // 2. Setup the dynamic X-Axis Selector
+                // 2. Setup the dynamic X-Axis Selector and trigger the initial chart draw
                 setupCategorySelector(programData);
-                console.log("--- DEBUG END ---");
 
             }).catch(error => {
                 const msg = "An error occurred during program data loading. Check your network connection and the published URL format.";
@@ -369,8 +381,8 @@
                 setStatus(`Error: ${msg}`, true);
                 // Display a generic error on the SVG too
                 svg.append("text")
-                   .attr("class", "error-text")
-                   .attr("x", initialWidth / 2) // Use initialWidth for fallback text centering
+                   .attr("class", "prompt-text")
+                   .attr("x", currentChartWidth / 2) 
                    .attr("y", 150)
                    .attr("text-anchor", "middle")
                    .style("font-size", "16px")
@@ -386,8 +398,9 @@
             // Calculate dynamic height based on number of goals
             const stepHeight = 18; 
             const dynamicHeight = goalIDs.length * stepHeight; 
-            // Only set height here, width is set in drawChart
+            // Set height of the SVG container
             svgContainer.attr("height", dynamicHeight + margin.top + margin.bottom);
+            svgContainer.attr("width", currentChartWidth + margin.left + margin.right);
             
             yScale = d3.scaleBand()
                 .domain(goalIDs) 
@@ -419,11 +432,10 @@
                 .text(d => d.replace(/_/g, ' '))
                 .attr("value", d => d);
 
-            // Initial draw (will fail without data, but prepares the selector)
-            // We now skip the initial draw in favor of the status message.
-            // drawChart(categoryOptions[0], programData); 
+            // Draw the chart with the first category as default
+            drawChart(categoryOptions[0], programData); 
 
-            // Listener for change (must be bound *after* the initial data is loaded)
+            // Listener for change 
             selector.on("change", function() {
                 const newCategory = d3.select(this).property("value");
                 drawChart(newCategory, programData);
@@ -438,16 +450,15 @@
             } else if (programCount === 1) {
                 return "#3498db"; // Blue for Coverage
             } else {
-                // If 0 programs, ensure it's a light background or transparent
                 return "#f0f0f0"; // Light Gray for No Coverage
             }
         }
 
         function drawChart(categoryKey, allProgramData) {
-            // Clear any previous drawing elements
+            // Clear any previous drawing elements (except the Y-Axis)
             svg.selectAll(".coverage-cell").remove();
             svg.selectAll(".x-axis").remove();
-            svg.selectAll(".error-text").remove(); // Clear previous errors
+            svg.selectAll(".prompt-text").remove();
             setStatus("Drawing visualization...", false);
 
             // A. Data Aggregation
@@ -458,15 +469,13 @@
                 let goalProgramsMap = new Map(); 
 
                 programsInGroup.forEach(program => {
-                    // Split the Goals_Covered string, handling potential spaces/commas
+                    // Split the Goals_Covered string
                     const goalsCoveredArray = program.Goals_Covered ? program.Goals_Covered.split(',').map(g => g.trim()) : [];
                     
                     goalsCoveredArray.forEach(goalId => {
-                        // Skip empty goal IDs
                         if (!goalId) return; 
                         
                         const currentPrograms = goalProgramsMap.get(goalId) || [];
-                        // Check if Program_Name exists before pushing
                         if (program.Program_Name) {
                             currentPrograms.push(program.Program_Name); 
                         }
@@ -487,20 +496,18 @@
             }
             
             // B. X-Axis Setup
-            // Filter out null/empty category values before creating the domain
             const categoryDomains = Array.from(new Set(allProgramData.map(d => d[categoryKey]))).filter(d => d).sort();
 
             // Calculate Dynamic Width based on categories
             currentChartWidth = Math.max(initialWidth, categoryDomains.length * MIN_CATEGORY_WIDTH);
 
-            // --- CRITICAL ERROR CHECK ---
             if (categoryDomains.length === 0) {
                 const msg = `Critical Error: Cannot find any unique values in the '${categoryKey.replace(/_/g, ' ')}' column. Please verify the header name in your published Sheet 2.`;
                 setStatus(msg, true);
                 console.error(msg);
                 
                 svg.append("text")
-                   .attr("class", "error-text")
+                   .attr("class", "prompt-text")
                    .attr("x", initialWidth / 2) 
                    .attr("y", 150)
                    .attr("text-anchor", "middle")
@@ -513,10 +520,6 @@
             // Update SVG container width dynamically.
             svgContainer.attr("width", currentChartWidth + margin.left + margin.right);
 
-            console.log(`[Draw] Grouping by: '${categoryKey}'. Found ${categoryDomains.length} unique X-axis categories. Dynamic Width: ${currentChartWidth}px`);
-            console.log(`[Draw] Generated ${cellData.length} total coverage cells.`);
-
-
             const xScale = d3.scaleBand()
                 .domain(categoryDomains)
                 .range([0, currentChartWidth]) // Use the dynamic width
@@ -527,20 +530,17 @@
                 .attr("class", "x-axis")
                 .call(d3.axisTop(xScale)) 
                 .selectAll("text")
-                // UPDATED: No rotation (0 degrees) for horizontal alignment
                 .style("text-anchor", "middle")
                 .attr("dx", "0em")
                 .attr("dy", "-.5em")
-                .attr("transform", "rotate(0)"); // Completely removed slant
+                .attr("transform", "rotate(0)");
 
             // C. Drawing Cells (Rectangles)
             const cells = svg.selectAll(".coverage-cell")
                 .data(cellData, d => d.goalId + d.category);
 
-            // EXIT (remove old cells)
             cells.exit().remove();
 
-            // ENTER + UPDATE (draw new/update existing cells)
             cells.enter()
                 .append("rect")
                 .attr("class", "coverage-cell")
@@ -587,22 +587,18 @@
             const loadButton = document.getElementById('loadDataButton');
             const programInput = document.getElementById('programUrlInput');
 
-            // Attach event listener to the "Load Data" button
+            // 1. Set up Y-Axis and Framework Data immediately for structural visibility
+            allFrameworkData = hardcodedFrameworkData; 
+            setupYAxis(hardcodedFrameworkData);
+            
+            // 2. Display the initial instruction prompt
+            showInitialPrompt();
+
+            // 3. Attach event listener to the "Load Data" button
             loadButton.addEventListener('click', () => {
                 const prgUrl = programInput.value.trim();
                 loadDataAndDrawChart(prgUrl);
             });
-
-            // Automatically load data on page load using the default value (which is now empty)
-            const initialUrl = programInput.value.trim();
-            // We call loadDataAndDrawChart to set the initial error state/prompt
-            loadDataAndDrawChart(initialUrl);
-
-            // Because the initial load fails with an empty string, we need to set up the Y-axis 
-            // and category selector based on the hardcoded framework data so the UI is ready.
-            allFrameworkData = hardcodedFrameworkData; 
-            setupYAxis(hardcodedFrameworkData);
-            // We cannot set up the category selector because we don't have programData yet.
         }
 
         // Start the application setup
