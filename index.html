@@ -81,18 +81,9 @@
             <!-- URL Inputs and Load Button -->
             <div class="w-full space-y-4 mb-4">
                 
-                <!-- Input Group 1: Framework Goals (Y-Axis) -->
+                <!-- Input Group 1: Program Coverage (X-Axis/Cells) + Load Button -->
                 <div>
-                    <label for="frameworkUrlInput" class="block text-sm font-medium text-gray-700 mb-1">1. Steps Framework Goals (Y-Axis)</label>
-                    <input type="text" id="frameworkUrlInput" 
-                        placeholder="Paste Published CSV URL for Sheet 1 (ID and Name columns required)" 
-                        class="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                        value="https://docs.google.com/spreadsheets/d/e/2PACX-1vTpPudMuby9FvHz-XPkMI7CwQ2QPkm6E8mPr8dQj07Va3Q_tIvo4_AfyhjX5YxgQyWfVIscRqdA9wuV/pub?gid=0&single=true&output=csv">
-                </div>
-                
-                <!-- Input Group 2: Program Coverage (X-Axis/Cells) + Load Button -->
-                <div>
-                    <label for="programUrlInput" class="block text-sm font-medium text-gray-700 mb-1">2. Program Coverage Data (X-Axis/Cells)</label>
+                    <label for="programUrlInput" class="block text-sm font-medium text-gray-700 mb-1">1. Program Coverage Data (X-Axis/Cells)</label>
                     <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
                         <input type="text" id="programUrlInput" 
                             placeholder="Paste Published CSV URL for Sheet 2 (Goals_Covered, Rigor, Program_Type columns required)" 
@@ -105,7 +96,7 @@
                     </div>
                 </div>
 
-                <div id="statusMessage" class="text-sm text-gray-600 mt-2">Enter your published Google Sheet CSV URLs above and click "Load Data" (or wait for the initial load).</div>
+                <div id="statusMessage" class="text-sm text-gray-600 mt-2">Enter your published Google Sheet CSV URL above and click "Load Data" (or wait for the initial load).</div>
             </div>
 
 
@@ -172,6 +163,77 @@
         let yScale; 
         let allFrameworkData; 
         
+        // --- HARDCODED FRAMEWORK DATA (Sheet 1 / Y-Axis) ---
+        const hardcodedFrameworkData = [
+            { ID: 'G-01', Name: 'Step 1', Grade: 'K' },
+            { ID: 'G-02', Name: 'Step 2', Grade: 'K' },
+            { ID: 'G-03', Name: 'Step 3', Grade: '1' },
+            { ID: 'G-04', Name: 'Step 4', Grade: '1' },
+            { ID: 'G-05', Name: 'Step 5', Grade: '1' },
+            { ID: 'G-06', Name: 'Step 6', Grade: '2' },
+            { ID: 'G-07', Name: 'Step 7', Grade: '2' },
+            { ID: 'G-08', Name: 'Step 8', Grade: '2' },
+            { ID: 'G-09', Name: 'Step 9', Grade: '3' },
+            { ID: 'G-10', Name: 'Step 10', Grade: '3' },
+            { ID: 'G-11', Name: 'Step 11', Grade: '3' },
+            { ID: 'G-12', Name: 'Step 12', Grade: '4' },
+            { ID: 'G-13', Name: 'Step 13', Grade: '4' },
+            { ID: 'G-14', Name: 'Step 14', Grade: '4' },
+            { ID: 'G-15', Name: 'Step 15', Grade: '5' },
+            { ID: 'G-16', Name: 'Step 16', Grade: '5' },
+            { ID: 'G-17', Name: 'Step 17', Grade: '5' },
+            { ID: 'G-18', Name: 'Step 18', Grade: '6' },
+            { ID: 'G-19', Name: 'Step 19', Grade: '6' },
+            { ID: 'G-20', Name: 'Step 20', Grade: '6' },
+            { ID: 'G-21', Name: 'Step 21', Grade: '7' },
+            { ID: 'G-22', Name: 'Step 22', Grade: '7' },
+            { ID: 'G-23', Name: 'Step 23', Grade: '7' },
+            { ID: 'G-24', Name: 'Step 24', Grade: '8' },
+            { ID: 'G-25', Name: 'Step 25', Grade: '8' },
+            { ID: 'G-26', Name: 'Step 26', Grade: '8' },
+            { ID: 'G-27', Name: 'Step 27', Grade: '9' },
+            { ID: 'G-28', Name: 'Step 28', Grade: '9' },
+            { ID: 'G-29', Name: 'Step 29', Grade: '9' },
+            { ID: 'G-30', Name: 'Step 30', Grade: '9' },
+            { ID: 'G-31', Name: 'Step 31', Grade: '10' },
+            { ID: 'G-32', Name: 'Step 32', Grade: '10' },
+            { ID: 'G-33', Name: 'Step 33', Grade: '10' },
+            { ID: 'G-34', Name: 'Step 34', Grade: '10' },
+            { ID: 'G-35', Name: 'Step 35', Grade: '11' },
+            { ID: 'G-36', Name: 'Step 36', Grade: '11' },
+            { ID: 'G-37', Name: 'Step 37', Grade: '11' },
+            { ID: 'G-38', Name: 'Step 38', Grade: '11' },
+            { ID: 'G-39', Name: 'Step 39', Grade: '12' },
+            { ID: 'G-40', Name: 'Step 40', Grade: '12' },
+            { ID: 'G-41', Name: 'Step 41', Grade: '12' },
+            { ID: 'G-42', Name: 'Step 42', Grade: '12' },
+            { ID: 'G-43', Name: 'Step 43', Grade: '12' },
+            { ID: 'G-44', Name: 'Step 44', Grade: '12' },
+            { ID: 'G-45', Name: 'Step 45', Grade: '12' },
+            { ID: 'G-46', Name: 'Step 46', Grade: '12' },
+            { ID: 'G-47', Name: 'Step 47', Grade: '12' },
+            { ID: 'G-48', Name: 'Step 48', Grade: '12' },
+            { ID: 'G-49', Name: 'Step 49', Grade: '12' },
+            { ID: 'G-50', Name: 'Step 50', Grade: '12' },
+            { ID: 'G-51', Name: 'Step 51', Grade: '12' },
+            { ID: 'G-52', Name: 'Step 52', Grade: '12' },
+            { ID: 'G-53', Name: 'Step 53', Grade: '12' },
+            { ID: 'G-54', Name: 'Step 54', Grade: '12' },
+            { ID: 'G-55', Name: 'Step 55', Grade: '12' },
+            { ID: 'G-56', Name: 'Step 56', Grade: '12' },
+            { ID: 'G-57', Name: 'Step 57', Grade: '12' },
+            { ID: 'G-58', Name: 'Step 58', Grade: '12' },
+            { ID: 'G-59', Name: 'Step 59', Grade: '12' },
+            { ID: 'G-60', Name: 'Step 60', Grade: '12' },
+            { ID: 'G-61', Name: 'Step 61', Grade: '12' },
+            { ID: 'G-62', Name: 'Step 62', Grade: '12' },
+            { ID: 'G-63', Name: 'Step 63', Grade: '12' },
+            { ID: 'G-64', Name: 'Step 64', Grade: '12' },
+            { ID: 'G-65', Name: 'Step 65', Grade: '12' },
+            { ID: 'G-66', Name: 'Step 66', Grade: '12' },
+            { ID: 'G-67', Name: 'Step 67', Grade: '12' }
+        ];
+        
         // Helper function to update the status message area
         function setStatus(message, isError = false) {
             const statusEl = document.getElementById('statusMessage');
@@ -183,33 +245,30 @@
 
         // --- 1. CORE LOGIC: DATA LOADING AND DRAWING ---
 
-        function loadDataAndDrawChart(frameworkUrl, programUrl) {
+        function loadDataAndDrawChart(programUrl) {
             
-            // Check for valid URLs
-            if (!frameworkUrl || !programUrl) {
-                setStatus("Error: Both URLs must be provided.", true);
+            // Check for valid URL
+            if (!programUrl) {
+                setStatus("Error: The Program Coverage URL must be provided.", true);
                 return;
             }
             
-            setStatus("Loading data...", false);
+            setStatus("Loading program coverage data...", false);
             
             // Clear previous chart elements before drawing the new one
             svgContainer.selectAll("g").remove();
             svg = svgContainer.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
             
-            // Use Promise.all to ensure both CSV files load before drawing
-            Promise.all([
-                d3.csv(frameworkUrl),
-                d3.csv(programUrl)
-            ]).then(([frameworkData, programData]) => {
+            // Only load the program data
+            d3.csv(programUrl).then(programData => {
                 
                 console.log("--- DEBUG START (Steps to Success Visualization) ---");
-                console.log("Sheet 1 (Framework) data length:", frameworkData.length);
-                console.log("Sheet 2 (Program) data length:", programData.length);
+                console.log("Hardcoded Framework Steps:", hardcodedFrameworkData.length);
+                console.log("Program Coverage Data length:", programData.length);
 
-                // Check if data loaded successfully 
-                if (!frameworkData || !programData || frameworkData.length === 0 || programData.length === 0) {
-                    const msg = "Failed to load data or data is empty. Ensure both Google Sheets are published as CSV and the URLs are correct.";
+                // Check if program data loaded successfully 
+                if (!programData || programData.length === 0) {
+                    const msg = "Failed to load program data or data is empty. Ensure your Google Sheet is published as CSV and the URL is correct.";
                     console.error(msg);
                     setStatus(`Error: ${msg}`, true);
                     return;
@@ -217,23 +276,23 @@
                 
                 if (programData.length > 0) {
                     // CRITICAL DEBUG LOG
-                    console.log("Sheet 2 (Program) Headers detected:", Object.keys(programData[0]));
+                    console.log("Program Headers detected:", Object.keys(programData[0]));
                     console.log("Required headers for grouping are 'Rigor' and 'Program_Type'. Required for linkage are 'Goals_Covered' and 'Program_Name'.");
                 }
 
                 setStatus("Data loaded successfully. Drawing visualization...", false);
 
-                allFrameworkData = frameworkData;
+                allFrameworkData = hardcodedFrameworkData; // Use hardcoded data
                 
-                // 1. Setup the static Y-Axis (Goals)
-                setupYAxis(frameworkData); 
+                // 1. Setup the static Y-Axis (Goals) - uses hardcoded data
+                setupYAxis(hardcodedFrameworkData); 
                 
                 // 2. Setup the dynamic X-Axis Selector
                 setupCategorySelector(programData);
                 console.log("--- DEBUG END ---");
 
             }).catch(error => {
-                const msg = "An error occurred during data loading. Check your network connection and URL format. Make sure both sheets are published as CSV.";
+                const msg = "An error occurred during program data loading. Check your network connection and URL format. Make sure the sheet is published as CSV.";
                 console.error(msg, error);
                 setStatus(`Error: ${msg}`, true);
                 // Display a generic error on the SVG too
@@ -410,18 +469,16 @@
 
         function setupApp() {
             const loadButton = document.getElementById('loadDataButton');
-            const frameworkInput = document.getElementById('frameworkUrlInput');
             const programInput = document.getElementById('programUrlInput');
 
             // Attach event listener to the "Load Data" button
             loadButton.addEventListener('click', () => {
-                const fwUrl = frameworkInput.value.trim();
                 const prgUrl = programInput.value.trim();
-                loadDataAndDrawChart(fwUrl, prgUrl);
+                loadDataAndDrawChart(prgUrl);
             });
 
-            // Automatically load data on page load using the default values set in the input fields
-            loadDataAndDrawChart(frameworkInput.value.trim(), programInput.value.trim());
+            // Automatically load data on page load using the default value
+            loadDataAndDrawChart(programInput.value.trim());
         }
 
         // Start the application setup
