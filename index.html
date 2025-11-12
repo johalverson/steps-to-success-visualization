@@ -150,8 +150,11 @@
     <script>
         // Dimensions and Setup
         const margin = {top: 50, right: 20, bottom: 20, left: 100},
-              width = 700 - margin.left - margin.right,
-              height = 500 - margin.top - margin.bottom; 
+              // Renamed fixed width to initialWidth
+              initialWidth = 700 - margin.left - margin.right; 
+
+        const MIN_CATEGORY_WIDTH = 100; // Define minimum width for each category column
+        let currentChartWidth = initialWidth; // Variable to hold the dynamically calculated width
 
         // Initializing SVG container
         const svgContainer = d3.select("#timeline-chart");
@@ -288,15 +291,14 @@
             
             // Clear previous chart elements before drawing the new one
             svgContainer.selectAll("g").remove();
+            // Re-initialize the main 'g' element with initial transform
             svg = svgContainer.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
             
             // Only load the program data
             d3.csv(sanitizedUrl).then(programData => {
                 
                 console.log("--- DEBUG START (Steps to Success Visualization) ---");
-                console.log("Hardcoded Framework Steps:", hardcodedFrameworkData.length);
-                console.log("Program Coverage Data length:", programData.length);
-
+                
                 // Check if program data loaded successfully 
                 if (!programData || programData.length === 0) {
                     const msg = "Failed to load program data or data is empty. Ensure your Google Sheet is published and the URL is correct.";
@@ -305,12 +307,6 @@
                     return;
                 }
                 
-                if (programData.length > 0) {
-                    // CRITICAL DEBUG LOG
-                    console.log("Program Headers detected:", Object.keys(programData[0]));
-                    console.log("Required headers for grouping are 'Rigor' and 'Program_Type'. Required for linkage are 'Goals_Covered' and 'Program_Name'.");
-                }
-
                 setStatus("Data loaded successfully. Drawing visualization...", false);
 
                 allFrameworkData = hardcodedFrameworkData; // Use hardcoded data
@@ -328,8 +324,8 @@
                 setStatus(`Error: ${msg}`, true);
                 // Display a generic error on the SVG too
                 svg.append("text")
-                   .attr("x", width / 2)
-                   .attr("y", height / 2)
+                   .attr("x", initialWidth / 2) // Use initialWidth for fallback text centering
+                   .attr("y", 150)
                    .attr("text-anchor", "middle")
                    .style("font-size", "16px")
                    .text("Error: Data loading failed.");
@@ -343,6 +339,7 @@
             // Calculate dynamic height based on number of goals
             const stepHeight = 18; 
             const dynamicHeight = goalIDs.length * stepHeight; 
+            // Only set height here, width is set in drawChart
             svgContainer.attr("height", dynamicHeight + margin.top + margin.bottom);
             
             yScale = d3.scaleBand()
@@ -437,22 +434,33 @@
             // Filter out null/empty category values before creating the domain
             const categoryDomains = Array.from(new Set(allProgramData.map(d => d[categoryKey]))).filter(d => d).sort();
 
-            console.log(`[Draw] Grouping by: '${categoryKey}'. Found ${categoryDomains.length} unique X-axis categories.`);
+            // Calculate Dynamic Width based on categories
+            currentChartWidth = Math.max(initialWidth, categoryDomains.length * MIN_CATEGORY_WIDTH);
+
+            // Update SVG container width dynamically. This is the fix for the hanging issue.
+            svgContainer.attr("width", currentChartWidth + margin.left + margin.right);
+
+            console.log(`[Draw] Grouping by: '${categoryKey}'. Found ${categoryDomains.length} unique X-axis categories. Dynamic Width: ${currentChartWidth}px`);
+            
             if (categoryDomains.length === 0) {
                  console.warn(`[Draw Warning] No unique category domains found for X-Axis. Check if column '${categoryKey}' exists and contains data in your Sheet 2.`);
             }
 
-
             const xScale = d3.scaleBand()
                 .domain(categoryDomains)
-                .range([0, width])
+                .range([0, currentChartWidth]) // Use the dynamic width
                 .paddingInner(0.1);
 
             // Redraw X-Axis
             svg.selectAll(".x-axis").remove();
             svg.append("g")
                 .attr("class", "x-axis")
-                .call(d3.axisTop(xScale)); 
+                .call(d3.axisTop(xScale)) 
+                .selectAll("text")
+                .style("text-anchor", "end")
+                .attr("dx", "-.8em")
+                .attr("dy", ".15em")
+                .attr("transform", "rotate(-35)"); // Rotate labels to prevent overlap
 
             // C. Drawing Cells (Rectangles)
             const cells = svg.selectAll(".coverage-cell")
