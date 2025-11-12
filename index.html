@@ -76,23 +76,35 @@
         <!-- UI Container (Hidden during Print) -->
         <div class="print-hidden flex flex-col items-start mb-6 p-4 bg-white rounded-lg shadow-md">
             
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 w-full">Data Source Configuration</h2>
+
             <!-- URL Inputs and Load Button -->
-            <div class="w-full space-y-3 mb-4">
-                <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
+            <div class="w-full space-y-4 mb-4">
+                
+                <!-- Input Group 1: Framework Goals (Y-Axis) -->
+                <div>
+                    <label for="frameworkUrlInput" class="block text-sm font-medium text-gray-700 mb-1">1. Steps Framework Goals (Y-Axis)</label>
                     <input type="text" id="frameworkUrlInput" 
-                        placeholder="Framework Goals URL (Sheet 1)" 
-                        class="flex-1 p-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                        placeholder="Paste Published CSV URL for Sheet 1 (ID and Name columns required)" 
+                        class="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" 
                         value="https://docs.google.com/spreadsheets/d/e/2PACX-1vTpPudMuby9FvHz-XPkMI7CwQ2QPkm6E8mPr8dQj07Va3Q_tIvo4_AfyhjX5YxgQyWfVIscRqdA9wuV/pub?gid=0&single=true&output=csv">
-                        
-                    <input type="text" id="programUrlInput" 
-                        placeholder="Program Coverage URL (Sheet 2)" 
-                        class="flex-1 p-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                        value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRrjvzfjIw_94rvnndwyogjC_NZ2Z_nNZqdOyyUoybkqk0YaCj8SSb0LQeZDMmDA0qWdmGYAkpZIDJv/pub?gid=0&single=true&output=csv">
-                    
-                    <button id="loadDataButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-150 ease-in-out whitespace-nowrap">
-                        Load Data
-                    </button>
                 </div>
+                
+                <!-- Input Group 2: Program Coverage (X-Axis/Cells) + Load Button -->
+                <div>
+                    <label for="programUrlInput" class="block text-sm font-medium text-gray-700 mb-1">2. Program Coverage Data (X-Axis/Cells)</label>
+                    <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
+                        <input type="text" id="programUrlInput" 
+                            placeholder="Paste Published CSV URL for Sheet 2 (Goals_Covered, Rigor, Program_Type columns required)" 
+                            class="flex-1 p-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                            value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRrjvzfjIw_94rvnndwyogjC_NZ2Z_nNZqdOyyUoybkqk0YaCj8SSb0LQeZDMmDA0qWdmGYAkpZIDJv/pub?gid=0&single=true&output=csv">
+                        
+                        <button id="loadDataButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-150 ease-in-out whitespace-nowrap">
+                            Load Data
+                        </button>
+                    </div>
+                </div>
+
                 <div id="statusMessage" class="text-sm text-gray-600 mt-2">Enter your published Google Sheet CSV URLs above and click "Load Data" (or wait for the initial load).</div>
             </div>
 
@@ -221,7 +233,7 @@
                 console.log("--- DEBUG END ---");
 
             }).catch(error => {
-                const msg = "An error occurred during data loading. Check your network connection and URL format.";
+                const msg = "An error occurred during data loading. Check your network connection and URL format. Make sure both sheets are published as CSV.";
                 console.error(msg, error);
                 setStatus(`Error: ${msg}`, true);
                 // Display a generic error on the SVG too
@@ -335,4 +347,85 @@
             // Filter out null/empty category values before creating the domain
             const categoryDomains = Array.from(new Set(allProgramData.map(d => d[categoryKey]))).filter(d => d).sort();
 
-            console.log(`[Draw] Grouping by: '${categoryKey}'. Found ${
+            console.log(`[Draw] Grouping by: '${categoryKey}'. Found ${categoryDomains.length} unique X-axis categories.`);
+            if (categoryDomains.length === 0) {
+                 console.warn(`[Draw Warning] No unique category domains found for X-Axis. Check if column '${categoryKey}' exists and contains data in your Sheet 2.`);
+            }
+
+
+            const xScale = d3.scaleBand()
+                .domain(categoryDomains)
+                .range([0, width])
+                .paddingInner(0.1);
+
+            // Redraw X-Axis
+            svg.selectAll(".x-axis").remove();
+            svg.append("g")
+                .attr("class", "x-axis")
+                .call(d3.axisTop(xScale)); 
+
+            // C. Drawing Cells (Rectangles)
+            const cells = svg.selectAll(".coverage-cell")
+                .data(cellData, d => d.goalId + d.category);
+
+            // EXIT (remove old cells)
+            cells.exit().remove();
+
+            // ENTER + UPDATE (draw new/update existing cells)
+            cells.enter()
+                .append("rect")
+                .attr("class", "coverage-cell")
+                .merge(cells) 
+                .attr("x", d => xScale(d.category))
+                .attr("y", d => yScale(d.goalId))
+                .attr("width", xScale.bandwidth())
+                .attr("height", yScale.bandwidth())
+                .attr("fill", d => getColor(d.programCount))
+                
+                // --- Tooltip Interactivity ---
+                .on("mouseover", function(event, d) {
+                    tooltip.style("visibility", "visible");
+                    d3.select(this).attr("stroke", "#2c3e50").attr("stroke-width", 2);
+                })
+                .on("mousemove", function(event, d) {
+                    // Find the Step Name for the tooltip using the global framework data
+                    const goalName = allFrameworkData.find(g => g.ID === d.goalId)?.Name || d.goalId;
+
+                    tooltip.style("left", (event.pageX + 10) + "px")     
+                           .style("top", (event.pageY - 20) + "px")
+                           .html(`
+                               <strong>Goal:</strong> ${goalName}<br>
+                               <strong>Category:</strong> ${d.category}<br>
+                               <strong>Programs:</strong> ${d.programNames.join(", ")}<br>
+                               ${d.programCount >= 2 ? `<strong>Overlap: ${d.programCount} programs</strong>` : 'Coverage'}
+                           `);
+                })
+                .on("mouseout", function() {
+                    tooltip.style("visibility", "hidden");
+                    d3.select(this).attr("stroke", "none");
+                });
+        }
+
+        // --- 3. APP SETUP ---
+
+        function setupApp() {
+            const loadButton = document.getElementById('loadDataButton');
+            const frameworkInput = document.getElementById('frameworkUrlInput');
+            const programInput = document.getElementById('programUrlInput');
+
+            // Attach event listener to the "Load Data" button
+            loadButton.addEventListener('click', () => {
+                const fwUrl = frameworkInput.value.trim();
+                const prgUrl = programInput.value.trim();
+                loadDataAndDrawChart(fwUrl, prgUrl);
+            });
+
+            // Automatically load data on page load using the default values set in the input fields
+            loadDataAndDrawChart(frameworkInput.value.trim(), programInput.value.trim());
+        }
+
+        // Start the application setup
+        setupApp();
+    </script>
+</body>
+</html>
