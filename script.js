@@ -1,35 +1,12 @@
 // script.js
 
-// --- 1. SIMULATED DATA (Updated for 67 Steps) ---
-
-// Generate 67 sequential goals for the Y-Axis
-const frameworkData = [];
-for (let i = 1; i <= 67; i++) {
-    frameworkData.push({
-        ID: `G-${i.toString().padStart(2, '0')}`, 
-        Name: `Step ${i}`, 
-        Grade: Math.ceil(i / 6) // Dummy Grade for reference
-    });
-}
-
-// This simulates the data staff would enter into Google Sheets. 
-// Note: The Goals_Covered now references the new IDs (G-01 to G-67).
-const programData = [
-    // Example programs referencing the new G-XX IDs
-    {Program_Name: "Foundational Math", Goals_Covered: "G-01, G-02, G-03, G-04", Rigor: "Low", Program_Type: "District"},
-    {Program_Name: "Literacy Workshop", Goals_Covered: "G-05, G-06, G-07, G-08, G-09", Rigor: "Medium", Program_Type: "District"},
-    {Program_Name: "Community Mentoring", Goals_Covered: "G-01, G-04, G-05, G-10, G-15", Rigor: "Low", Program_Type: "Community"},
-    {Program_Name: "Advanced Algebra Prep", Goals_Covered: "G-10, G-11, G-12, G-13", Rigor: "High", Program_Type: "District"},
-    {Program_Name: "Science Capstone", Goals_Covered: "G-14, G-15, G-16, G-17", Rigor: "High", Program_Type: "Community"},
-    // Example OVERLAP on G-10 and G-15
-    {Program_Name: "STEM Enrichment", Goals_Covered: "G-10, G-15, G-18, G-19", Rigor: "Medium", Program_Type: "District"}, 
-    // Example data further down the curriculum
-    {Program_Name: "Senior Projects", Goals_Covered: "G-60, G-61, G-62, G-63, G-64, G-65, G-66, G-67", Rigor: "High", Program_Type: "District"},
-];
-// --- END SIMULATED DATA ---
+// --- 1. USER INPUT: PASTE YOUR PUBLISHED GOOGLE SHEET CSV URLs HERE ---
+const FRAMEWORK_URL = "PASTE_YOUR_SHEET_1_FRAMEWORK_CSV_URL_HERE";
+const PROGRAM_URL = "PASTE_YOUR_SHEET_2_PROGRAMS_CSV_URL_HERE";
+// --- END USER INPUT ---
 
 // Dimensions and Setup
-const margin = {top: 50, right: 20, bottom: 20, left: 100}, // Reduced left margin since Step X is shorter
+const margin = {top: 50, right: 20, bottom: 20, left: 100},
       width = 700 - margin.left - margin.right,
       height = 500 - margin.top - margin.bottom; 
 
@@ -42,18 +19,36 @@ const svg = d3.select("#timeline-chart")
 const tooltip = d3.select("#tooltip");
 const categoryOptions = ["Rigor", "Program_Type"]; 
 let yScale; 
+let allFrameworkData; 
 
-// --- 2. INITIALIZATION ---
+// --- 2. INITIALIZATION (Loads Data from URLs) ---
 
-function initializeChart(frameworkData, programData) {
-    // 1. Setup the static Y-Axis (Handles the 67 Steps)
-    setupYAxis(frameworkData); 
-    
-    // 2. Setup the dynamic X-Axis Selector
-    setupCategorySelector(programData);
+function initializeChart() {
+    // Use Promise.all to ensure both CSV files load before drawing
+    Promise.all([
+        d3.csv(FRAMEWORK_URL),
+        d3.csv(PROGRAM_URL)
+    ]).then(([frameworkData, programData]) => {
+        
+        if (!frameworkData || !programData) {
+            console.error("Failed to load data from Google Sheet URLs. Please ensure URLs are correct and sheets are published.");
+            return;
+        }
+
+        allFrameworkData = frameworkData;
+        
+        // 1. Setup the static Y-Axis (Handles the 67 Steps)
+        setupYAxis(frameworkData); 
+        
+        // 2. Setup the dynamic X-Axis Selector
+        setupCategorySelector(programData);
+
+    }).catch(error => {
+        console.error("An error occurred during data loading:", error);
+    });
 }
 
-// Y-Axis (Goals) Setup - MODIFIED
+// Y-Axis (Goals) Setup
 function setupYAxis(frameworkData) {
     const goalIDs = frameworkData.map(d => d.ID); 
     
@@ -70,8 +65,8 @@ function setupYAxis(frameworkData) {
     // Draw the Y-axis (Now uses "Step X" instead of goal names)
     svg.append("g")
         .attr("class", "y-axis")
-        // The tickFormat now uses the Name property, which is "Step X"
-        .call(d3.axisLeft(yScale).tickFormat(d => frameworkData.find(g => g.ID === d).Name || d)) 
+        // Use the Name property from the framework data for the tick label
+        .call(d3.axisLeft(yScale).tickFormat(d => frameworkData.find(g => g.ID === d)?.Name || d)) 
         .selectAll("text")
         .attr("dy", ".32em")
         .style("text-anchor", "end");
@@ -119,7 +114,8 @@ function drawChart(categoryKey, allProgramData) {
         let goalProgramsMap = new Map(); 
 
         programsInGroup.forEach(program => {
-            const goalsCoveredArray = program.Goals_Covered.split(',').map(g => g.trim());
+            // Split the Goals_Covered string, handling potential spaces/commas
+            const goalsCoveredArray = program.Goals_Covered ? program.Goals_Covered.split(',').map(g => g.trim()) : [];
             
             goalsCoveredArray.forEach(goalId => {
                 const currentPrograms = goalProgramsMap.get(goalId) || [];
@@ -141,7 +137,8 @@ function drawChart(categoryKey, allProgramData) {
     }
 
     // B. X-Axis Setup
-    const categoryDomains = [...new Set(allProgramData.map(d => d[categoryKey]))].sort();
+    // Use Array.from(new Set(...)) for IE/older browser compatibility 
+    const categoryDomains = Array.from(new Set(allProgramData.map(d => d[categoryKey]))).filter(d => d).sort();
 
     const xScale = d3.scaleBand()
         .domain(categoryDomains)
@@ -178,8 +175,8 @@ function drawChart(categoryKey, allProgramData) {
             d3.select(this).attr("stroke", "#2c3e50").attr("stroke-width", 2);
         })
         .on("mousemove", function(event, d) {
-            // Find the Step Name for the tooltip
-            const goalName = frameworkData.find(g => g.ID === d.goalId)?.Name || d.goalId;
+            // Find the Step Name for the tooltip using the global framework data
+            const goalName = allFrameworkData.find(g => g.ID === d.goalId)?.Name || d.goalId;
 
             tooltip.style("left", (event.pageX + 10) + "px")     
                    .style("top", (event.pageY - 20) + "px")
@@ -196,5 +193,5 @@ function drawChart(categoryKey, allProgramData) {
         });
 }
 
-// Start the whole process
-initializeChart(frameworkData, programData);
+// Start the process by loading the data
+initializeChart();
