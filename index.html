@@ -116,7 +116,7 @@
                         <input type="text" id="programUrlInput" 
                             placeholder="Paste the link from 'Publish to the web' for Sheet 2" 
                             class="flex-1 p-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                            value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRrjvzfjIw_94rvnndwyogjC_NZ2Z_nNZqdOyyUoybkqk0YaCjS8SSb0LQeZDMmDA0qWdmGYAkpZIDJv/pubhtml">
+                            value=""> <!-- VALUE CLEARED HERE -->
                         
                         <button id="loadDataButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-150 ease-in-out whitespace-nowrap">
                             Load Data
@@ -124,7 +124,7 @@
                     </div>
                 </div>
 
-                <div id="statusMessage" class="text-sm text-gray-600 mt-2">Enter your published Google Sheet URL above and click "Load Data". The app will automatically convert the URL to CSV format.</div>
+                <div id="statusMessage" class="text-sm text-red-600 font-semibold mt-2">Error: The Program Coverage URL must be provided.</div>
             </div>
 
 
@@ -419,9 +419,9 @@
                 .text(d => d.replace(/_/g, ' '))
                 .attr("value", d => d);
 
-            // Initial draw
-            const initialCategory = categoryOptions[0];
-            drawChart(initialCategory, programData);
+            // Initial draw (will fail without data, but prepares the selector)
+            // We now skip the initial draw in favor of the status message.
+            // drawChart(categoryOptions[0], programData); 
 
             // Listener for change (must be bound *after* the initial data is loaded)
             selector.on("change", function() {
@@ -593,8 +593,16 @@
                 loadDataAndDrawChart(prgUrl);
             });
 
-            // Automatically load data on page load using the default value
-            loadDataAndDrawChart(programInput.value.trim());
+            // Automatically load data on page load using the default value (which is now empty)
+            const initialUrl = programInput.value.trim();
+            // We call loadDataAndDrawChart to set the initial error state/prompt
+            loadDataAndDrawChart(initialUrl);
+
+            // Because the initial load fails with an empty string, we need to set up the Y-axis 
+            // and category selector based on the hardcoded framework data so the UI is ready.
+            allFrameworkData = hardcodedFrameworkData; 
+            setupYAxis(hardcodedFrameworkData);
+            // We cannot set up the category selector because we don't have programData yet.
         }
 
         // Start the application setup
